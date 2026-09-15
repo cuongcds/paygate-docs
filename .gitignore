@@ -1,0 +1,3 @@
+# paygate-php/ is its own repo (github.com/cuongcds/paygate-php), just
+# nested here as a filesystem location — not a submodule of this repo.
+paygate-php/
