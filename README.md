@@ -10,6 +10,7 @@ Language-agnostic integration reference for PayGate, a multi-tenant payment gate
   - [03.03 — Hosted checkout picker page](documents/03.03-checkout-page.md)
   - [03.04 — Testing without a real Stripe account](documents/03.04-testing.md)
 - [04 — Webhooks](documents/04-webhooks.md)
+  - [04.01 — Registering your webhook](documents/04.01-registering-your-webhook.md)
 - [05 — Errors](documents/05-errors.md)
 
 ## Base URLs
