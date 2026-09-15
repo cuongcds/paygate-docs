@@ -14,6 +14,7 @@ Language-agnostic integration reference for PayGate, a multi-tenant payment gate
   - [04.01 — Registering your webhook](documents/04.01-registering-your-webhook.md)
 - [05 — Errors](documents/05-errors.md)
 - [06 — Postman collection](documents/06-postman-collection.md)
+- [07 — Understanding external_ref](documents/07-external-ref.md)
 
 ## Base URLs
 

@@ -80,3 +80,5 @@ The `sub` claim (Firebase UID) becomes `external_ref` automatically — **any `e
 | Setup | `api_key` + `api_secret` | `api_key` unused for auth; Firebase project ID registered instead |
 
 An app is configured for exactly one strategy at creation time — this isn't a per-request choice.
+
+See [07 — Understanding external_ref](07-external-ref.md) for the full picture of how `external_ref` behaves across every endpoint, not just at checkout.
