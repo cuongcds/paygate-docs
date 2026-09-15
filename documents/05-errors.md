@@ -20,7 +20,7 @@ Every error response follows the same shape:
 | `provider_error` | 502 | Stripe itself rejected the request | Transient — safe to retry with backoff |
 | `invalid_card_details` | 400 | Test card declined (`test_card_code=4000000000000002`) | |
 | `insufficient_funds` | 402 | Test card declined (`test_card_code=4000000000009995`) | |
-| `not_found` | 404 | `GET /subscriptions/{external_ref}` — no subscription record for that user | Not necessarily an error in your flow |
+| `not_found` | 404 | `GET /subscriptions/{external_ref}` — no subscription record for that user; or `GET /transactions/{transaction_id}` — id doesn't exist, or belongs to a different app/user | Not necessarily an error in your flow |
 | `forbidden` | 403 | Firebase ID Token caller requested a different `external_ref` than their own token's `sub` | |
 
 Any other `error.code` not listed here — including the case where a webhook's own signature check fails (returns `invalid_signature` too, but at `400` rather than `401`, since that's PayGate's own inbound endpoint, not one you call) — should be treated as opaque; don't pattern-match on `message` text, only on `code`.
