@@ -1,0 +1,130 @@
+{
+	"info": {
+		"name": "PayGate Merchant API",
+		"description": "Merchant-facing PayGate endpoints (HMAC auth). See ../documents/ for the full API reference. Firebase ID Token auth is client-side only and intentionally not covered here — see documents/02-authentication.md.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "base_url", "value": "https://payments.example.com", "description": "Your gateway operator's base URL (no trailing slash)." },
+		{ "key": "api_key", "value": "pgk_your_api_key", "description": "Your app's api_key (X-App-Key)." },
+		{ "key": "api_secret", "value": "your_api_secret", "description": "Your app's api_secret, used only to sign requests locally in the pre-request script — never sent as a header itself." },
+		{ "key": "external_ref", "value": "test-user-1", "description": "Your identifier for the end user placing the request." }
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Signs every request in this collection per documents/02-authentication.md (HMAC strategy).",
+					"// signed_payload = \"{timestamp}.{METHOD}.{path}.{raw_body}\"",
+					"// signature      = hex(HMAC_SHA256(signed_payload, api_secret))",
+					"//",
+					"// IMPORTANT: pm.request.body.raw still contains unresolved {{variables}} at",
+					"// this point (Postman only substitutes them when it builds the outgoing",
+					"// request, which happens AFTER this script runs) — so it must be resolved",
+					"// here via pm.variables.replaceIn() to match the exact bytes that will be",
+					"// sent on the wire. Signing the unresolved template produces a signature",
+					"// that mismatches the real body and gets rejected as invalid_signature.",
+					"//",
+					"// pm.variables.get() (not pm.collectionVariables.get()) so this also picks",
+					"// up an override from a Postman/Newman environment, not just the",
+					"// collection's own default variable values.",
+					"",
+					"const apiSecret = pm.variables.get('api_secret');",
+					"const timestamp = Math.floor(Date.now() / 1000).toString();",
+					"",
+					"const path = '/' + pm.request.url.path.map((segment) => pm.variables.replaceIn(segment)).join('/');",
+					"",
+					"let rawBody = '';",
+					"if (pm.request.body && pm.request.body.mode === 'raw') {",
+					"    rawBody = pm.variables.replaceIn(pm.request.body.raw || '');",
+					"}",
+					"",
+					"const method = pm.request.method.toUpperCase();",
+					"const signedPayload = `${timestamp}.${method}.${path}.${rawBody}`;",
+					"const signature = CryptoJS.HmacSHA256(signedPayload, apiSecret).toString(CryptoJS.enc.Hex);",
+					"",
+					"pm.collectionVariables.set('_computed_timestamp', timestamp);",
+					"pm.collectionVariables.set('_computed_signature', signature);"
+				]
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "Checkout Sessions",
+			"item": [
+				{
+					"name": "Create checkout session (production — Stripe/picker)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"external_ref\": \"{{external_ref}}\",\n  \"plan_ref\": \"premium_1m\",\n  \"amount\": 199000,\n  \"currency\": \"VND\",\n  \"mode\": \"subscription\",\n  \"interval\": \"month\",\n  \"interval_count\": 1,\n  \"success_url\": \"https://yourapp.com/success\",\n  \"cancel_url\": \"https://yourapp.com/cancel\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/checkout-sessions",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "checkout-sessions" ]
+						},
+						"description": "No `payment_method` sent — see documents/03.01-checkout-sessions.md. Redirect the end user to `data.checkout_url` in the response."
+					},
+					"response": []
+				},
+				{
+					"name": "Create checkout session (test payment_method — synchronous)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"external_ref\": \"{{external_ref}}\",\n  \"plan_ref\": \"premium_1m\",\n  \"amount\": 199000,\n  \"currency\": \"VND\",\n  \"mode\": \"subscription\",\n  \"interval\": \"month\",\n  \"interval_count\": 1,\n  \"success_url\": \"https://yourapp.com/success\",\n  \"cancel_url\": \"https://yourapp.com/cancel\",\n  \"payment_method\": \"test\",\n  \"test_card_code\": \"4242424242424242\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/checkout-sessions",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "checkout-sessions" ]
+						},
+						"description": "Only works when your app's environment is `test`/`staging` — see documents/03.04-testing.md for other test_card_code values (decline scenarios)."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Subscriptions",
+			"item": [
+				{
+					"name": "Get subscription",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/{{external_ref}}",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "subscriptions", "{{external_ref}}" ]
+						},
+						"description": "Returns 404 not_found if this external_ref has never checked out — see documents/03.02-subscriptions.md."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
