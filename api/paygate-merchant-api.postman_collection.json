@@ -74,7 +74,7 @@
 							"host": [ "{{base_url}}" ],
 							"path": [ "api", "v1", "checkout-sessions" ]
 						},
-						"description": "No `payment_method` sent — see documents/03.01-checkout-sessions.md. Redirect the end user to `data.checkout_url` in the response."
+						"description": "No `payment_method` sent — see documents/03.01-checkout-sessions.md. Redirect the end user to `data.checkout_url` in the response. Your success_url/cancel_url will come back with paygate_transaction_id/paygate_external_ref/paygate_status appended — see documents/03.01-checkout-sessions.md > \"What comes back on success_url/cancel_url\"."
 					},
 					"response": []
 				},
@@ -120,7 +120,7 @@
 							"host": [ "{{base_url}}" ],
 							"path": [ "api", "v1", "checkout-sessions" ]
 						},
-						"description": "`mode=\"payment\"` — a single non-recurring charge, no `interval`/`interval_count` needed (those only apply to `mode=\"subscription\"`). No `payment_method` sent — see documents/03.01-checkout-sessions.md. Redirect the end user to `data.checkout_url` in the response."
+						"description": "`mode=\"payment\"` — a single non-recurring charge, no `interval`/`interval_count` needed (those only apply to `mode=\"subscription\"`). No `payment_method` sent — see documents/03.01-checkout-sessions.md. Redirect the end user to `data.checkout_url` in the response. Your success_url/cancel_url will come back with paygate_transaction_id/paygate_external_ref/paygate_status appended."
 					},
 					"response": []
 				},
