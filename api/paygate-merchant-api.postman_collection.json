@@ -100,6 +100,52 @@
 						"description": "Only works when your app's environment is `test`/`staging` — see documents/03.04-testing.md for other test_card_code values (decline scenarios)."
 					},
 					"response": []
+				},
+				{
+					"name": "Create one-time payment (production — Stripe/picker)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"external_ref\": \"{{external_ref}}\",\n  \"plan_ref\": \"one-time-purchase\",\n  \"amount\": 50000,\n  \"currency\": \"VND\",\n  \"mode\": \"payment\",\n  \"success_url\": \"https://yourapp.com/success\",\n  \"cancel_url\": \"https://yourapp.com/cancel\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/checkout-sessions",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "checkout-sessions" ]
+						},
+						"description": "`mode=\"payment\"` — a single non-recurring charge, no `interval`/`interval_count` needed (those only apply to `mode=\"subscription\"`). No `payment_method` sent — see documents/03.01-checkout-sessions.md. Redirect the end user to `data.checkout_url` in the response."
+					},
+					"response": []
+				},
+				{
+					"name": "Create one-time payment (test payment_method — synchronous)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"external_ref\": \"{{external_ref}}\",\n  \"plan_ref\": \"one-time-purchase\",\n  \"amount\": 50000,\n  \"currency\": \"VND\",\n  \"mode\": \"payment\",\n  \"success_url\": \"https://yourapp.com/success\",\n  \"cancel_url\": \"https://yourapp.com/cancel\",\n  \"payment_method\": \"test\",\n  \"test_card_code\": \"4242424242424242\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/checkout-sessions",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "checkout-sessions" ]
+						},
+						"description": "`mode=\"payment\"` resolved synchronously via a test card — `data.subscription.current_period_end` will be `null` since this isn't a subscription. Only works when your app's environment is `test`/`staging` — see documents/03.04-testing.md for other test_card_code values (decline scenarios)."
+					},
+					"response": []
 				}
 			]
 		},

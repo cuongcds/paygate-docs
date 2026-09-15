@@ -35,8 +35,10 @@ You never need to compute or paste a signature by hand, and `api_secret` itself 
 
 | Folder | Request | Maps to |
 | --- | --- | --- |
-| Checkout Sessions | Create checkout session (production — Stripe/picker) | [03.01](03.01-checkout-sessions.md) without `payment_method` |
-| Checkout Sessions | Create checkout session (test payment_method — synchronous) | [03.01](03.01-checkout-sessions.md) with `payment_method=test`, `test_card_code=4242424242424242` |
+| Checkout Sessions | Create checkout session (production — Stripe/picker) | [03.01](03.01-checkout-sessions.md) without `payment_method`, `mode="subscription"` |
+| Checkout Sessions | Create checkout session (test payment_method — synchronous) | [03.01](03.01-checkout-sessions.md) with `payment_method=test`, `mode="subscription"` |
+| Checkout Sessions | Create one-time payment (production — Stripe/picker) | [03.01](03.01-checkout-sessions.md) with `mode="payment"` — no `interval`/`interval_count` |
+| Checkout Sessions | Create one-time payment (test payment_method — synchronous) | [03.01](03.01-checkout-sessions.md) with `mode="payment"` + `payment_method=test` — `current_period_end` comes back `null` |
 | Subscriptions | Get subscription | [03.02](03.02-subscriptions.md) |
 
 To try other test card outcomes (declines), edit the `test_card_code` field per [03.04 — Testing](03.04-testing.md) — no other change needed, the signature updates automatically.
