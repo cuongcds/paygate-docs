@@ -32,6 +32,19 @@ Once a checkout is created, the same `external_ref` value threads through everyt
 
 It is never translated, hashed, or namespaced — the exact string you sent (HMAC) or the exact `sub` claim (Firebase ID Token) is what comes back everywhere above.
 
+## One `external_ref` can have many transactions, but only one subscription
+
+`external_ref` is **not unique** on `transactions` — every `POST /api/v1/checkout-sessions` call inserts a new transaction row regardless of how many already exist for that `external_ref`. This is intentional: a user can buy a one-time item (`mode: "payment"`) more than once, retry a subscription checkout after canceling or failing, or simply check out again later.
+
+`subscriptions`, by contrast, has exactly one row per `(app_id, external_ref)` — each successful subscription checkout **upserts** that single row rather than adding a new one.
+
+| Table | Rows per `external_ref` |
+| --- | --- |
+| `transactions` | Unlimited — one new row per checkout attempt, successful or not |
+| `subscriptions` | Exactly one (or zero, if the user has never completed a subscription checkout) |
+
+**Practical consequence:** if a user has multiple transactions, `GET /api/v1/subscriptions/{external_ref}` ([03.02](03.02-subscriptions.md)) only ever tells you their *current* subscription state — it can't tell you which specific checkout attempt just happened, or distinguish two separate one-time payments. When you need to confirm one particular attempt (e.g. handling a `success_url` redirect, or reconciling a specific purchase), use the `paygate_transaction_id` from that redirect with [`GET /api/v1/transactions/{transaction_id}`](03.05-transactions.md) instead of relying on `external_ref` alone.
+
 ## Practical implications
 
 - **Pick a stable, permanent value.** If you use your own database's user id, don't reuse it for a different user later (e.g. after account deletion) — PayGate has no way to know the old association should be forgotten, and a new user would inherit the old user's subscription history.
