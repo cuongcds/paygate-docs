@@ -1,0 +1,20 @@
+title: PayGate API Documentation
+description: Language-agnostic integration reference for PayGate, a multi-tenant payment gateway.
+theme: just-the-docs
+
+url: "https://cuongcds.github.io"
+baseurl: "/paygate-docs"
+
+exclude:
+  - paygate-php/
+  - paygate-nodejs/
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+
+nav_sort: case_insensitive
+search_enabled: true
+
+aux_links:
+  "PayGate PHP SDK":
+    - "https://github.com/cuongcds/paygate-php"

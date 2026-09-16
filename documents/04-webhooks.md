@@ -1,8 +1,14 @@
+---
+title: Webhooks
+nav_order: 4
+has_children: true
+---
+
 # Webhooks
 
 PayGate can push events to your own server so you don't have to poll. This page covers both directions:
 
-- **Outgoing** (PayGate → you): register a `webhook_url` on your app and PayGate will POST events to it. See [04.01 — Registering your webhook](04.01-registering-your-webhook.md) for setup and signature verification.
+- **Outgoing** (PayGate → you): register a `webhook_url` on your app and PayGate will POST events to it. See [04.01 — Registering your webhook](04.01-registering-your-webhook.html) for setup and signature verification.
 - **Incoming** (Stripe → PayGate): `POST /api/v1/webhooks/stripe` is PayGate's own endpoint — Stripe calls it, not you. Documented below so you understand what triggers your outgoing events.
 
 ## Events PayGate sends you

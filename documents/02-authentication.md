@@ -1,3 +1,8 @@
+---
+title: Authentication
+nav_order: 2
+---
+
 # Authentication
 
 Every `/api/v1/*` request (except the Stripe webhook, which verifies itself via `Stripe-Signature`) must use exactly one of two strategies, chosen when your app was registered. PayGate picks the strategy per request by which header is present — `Authorization: Bearer` is checked first, then `X-App-Key`.
@@ -81,4 +86,4 @@ The `sub` claim (Firebase UID) becomes `external_ref` automatically — **any `e
 
 An app is configured for exactly one strategy at creation time — this isn't a per-request choice.
 
-See [07 — Understanding external_ref](07-external-ref.md) for the full picture of how `external_ref` behaves across every endpoint, not just at checkout.
+See [07 — Understanding external_ref](07-external-ref.html) for the full picture of how `external_ref` behaves across every endpoint, not just at checkout.

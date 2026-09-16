@@ -1,3 +1,8 @@
+---
+title: Errors
+nav_order: 5
+---
+
 # Errors
 
 Every error response follows the same shape:
