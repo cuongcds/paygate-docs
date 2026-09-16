@@ -15,6 +15,15 @@ exclude:
 nav_sort: case_insensitive
 search_enabled: true
 
+defaults:
+  - scope:
+      path: ""
+      type: pages
+    values:
+      layout: default
+
 aux_links:
   "PayGate PHP SDK":
     - "https://github.com/cuongcds/paygate-php"
+  "PayGate Node.js SDK":
+    - "https://github.com/cuongcds/paygate-node"
