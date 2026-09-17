@@ -41,12 +41,10 @@ You never need to compute or paste a signature by hand, and `api_secret` itself 
 | Folder | Request | Maps to |
 | --- | --- | --- |
 | Checkout Sessions | Create checkout session (production — Stripe/picker) | [03.01](03.01-checkout-sessions.html) without `payment_method`, `mode="subscription"` |
-| Checkout Sessions | Create checkout session (test payment_method — synchronous) | [03.01](03.01-checkout-sessions.html) with `payment_method=test`, `mode="subscription"` |
 | Checkout Sessions | Create one-time payment (production — Stripe/picker) | [03.01](03.01-checkout-sessions.html) with `mode="payment"` — no `interval`/`interval_count` |
-| Checkout Sessions | Create one-time payment (test payment_method — synchronous) | [03.01](03.01-checkout-sessions.html) with `mode="payment"` + `payment_method=test` — `current_period_end` comes back `null` |
 | Subscriptions | Get subscription | [03.02](03.02-subscriptions.html) |
 
-To try other test card outcomes (declines), edit the `test_card_code` field per [03.04 — Testing](03.04-testing.html) — no other change needed, the signature updates automatically.
+Neither request sends `payment_method` — `checkout-sessions` never accepts `test` or a `test_card_code`. To exercise the Test Payment Method card codes (per [03.04 — Testing](03.04-testing.html)), open the `checkout_url` these requests return in a browser and choose it on PayGate's hosted picker page; that step isn't part of the Postman collection.
 
 ## Troubleshooting
 
@@ -54,6 +52,6 @@ To try other test card outcomes (declines), edit the `test_card_code` field per 
 | --- | --- |
 | `401 invalid_signature` | Wrong `api_secret` variable, or you hand-edited a header instead of letting the pre-request script fill it | 
 | `401 expired_timestamp` | Your machine's clock is off — sync it (NTP) |
-| `403 payment_method_not_allowed` | Your app's environment doesn't allow `test_card_code` requests — check `apps.environment` in the app portal |
+| `403 payment_method_not_allowed` | The `payment_method` you sent isn't enabled for your app's environment/configuration — check `apps.environment` and its active providers in the app portal |
 
 See [05 — Errors](05-errors.html) for the full list of error codes.
