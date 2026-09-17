@@ -42,9 +42,10 @@ You never need to compute or paste a signature by hand, and `api_secret` itself 
 | --- | --- | --- |
 | Checkout Sessions | Create checkout session (production — Stripe/picker) | [03.01](03.01-checkout-sessions.html) without `payment_method`, `mode="subscription"` |
 | Checkout Sessions | Create one-time payment (production — Stripe/picker) | [03.01](03.01-checkout-sessions.html) with `mode="payment"` — no `interval`/`interval_count` |
+| Checkout Sessions | Create checkout session (payment_method=test — picker) | [03.01](03.01-checkout-sessions.html) with `payment_method="test"`, `mode="subscription"` — still just returns a `checkout_url` to the picker page |
 | Subscriptions | Get subscription | [03.02](03.02-subscriptions.html) |
 
-Neither request sends `payment_method` — `checkout-sessions` never accepts `test` or a `test_card_code`. To exercise the Test Payment Method card codes (per [03.04 — Testing](03.04-testing.html)), open the `checkout_url` these requests return in a browser and choose it on PayGate's hosted picker page; that step isn't part of the Postman collection.
+None of these requests get back a payment result directly — `checkout-sessions` never accepts a `test_card_code` and never resolves a payment result itself, even when `payment_method="test"` is sent. To exercise the Test Payment Method card codes (per [03.04 — Testing](03.04-testing.html)), open the `checkout_url` any of these requests return in a browser and choose Test Payment Method on PayGate's hosted picker page; that step isn't part of the Postman collection.
 
 ## Troubleshooting
 

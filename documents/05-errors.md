@@ -21,7 +21,7 @@ Every error response follows the same shape:
 | `invalid_token` | 401 | Firebase ID Token failed signature/issuer/expiry checks | |
 | `app_not_found` | 401 | Firebase ID Token's `aud` doesn't match any registered app | |
 | `invalid_request` | 400 | Body validation failed (missing/invalid field) | `message` describes the specific field |
-| `payment_method_not_allowed` | 403 | Requested `payment_method` isn't enabled for your app's environment/configuration | e.g. `stripe` against an app with no active Stripe credentials |
+| `payment_method_not_allowed` | 403 | Requested `payment_method` isn't enabled for your app's environment/configuration | e.g. `test` against a `production` app, or `stripe` against an app with no active Stripe credentials |
 | `provider_error` | 502 | Stripe/PayOS itself rejected the request | Transient — safe to retry with backoff |
 | `invalid_card_details` | 400 | Test Payment Method card declined on the hosted picker page (`test_card_code=4000000000000002`) — not returned by `checkout-sessions` itself | |
 | `insufficient_funds` | 402 | Test Payment Method card declined on the hosted picker page (`test_card_code=4000000000009995`) — not returned by `checkout-sessions` itself | |
