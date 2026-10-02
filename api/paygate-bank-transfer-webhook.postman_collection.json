@@ -1,0 +1,475 @@
+{
+	"info": {
+		"name": "PayGate Bank Transfer Webhook",
+		"description": "Simulates the email-notification service calling PayGate's POST /api/v1/webhooks/bank-transfer with the parsed Timo credit and the email header fields. Signed in the collection pre-request script with BANK_NOTIFY_SECRET (HMAC-SHA256 over \"{timestamp}.{raw_body}\"). PayGate verifies the header fields (sender authentication, recipient code). Internal endpoint, not for merchants. See docs/plans/13-chuyen-khoan-ngan-hang.md.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://payments.example.com",
+			"description": "PayGate base URL (no trailing slash)."
+		},
+		{
+			"key": "bank_notify_secret",
+			"value": "your_BANK_NOTIFY_SECRET",
+			"description": "Same value as BANK_NOTIFY_SECRET on PayGate and email-notification. Used only to sign locally, never sent as a header."
+		},
+		{
+			"key": "transfer_code",
+			"value": "PG-AB12CD34EF",
+			"description": "Transfer code of a pending bank_transfer transaction (shown on its /checkout/{token}/bank page). Placed in the transfer content."
+		},
+		{
+			"key": "amount",
+			"value": "70000",
+			"description": "Amount in VND. Must be >= the transaction amount to complete it."
+		},
+		{
+			"key": "underpaid_amount",
+			"value": "1000",
+			"description": "Amount used by the underpaid request. Must be LOWER than the transaction amount."
+		},
+		{
+			"key": "recipient_code",
+			"value": "0123456789",
+			"description": "The 10-digit code of the forward address (paygate+{code}@...) of the bank account selected by the app. Secret."
+		},
+		{
+			"key": "forward_local_part",
+			"value": "paygate",
+			"description": "Must equal BANK_FORWARD_LOCAL_PART on PayGate."
+		},
+		{
+			"key": "forward_domain",
+			"value": "shplinks.com",
+			"description": "Must equal BANK_FORWARD_DOMAIN on PayGate."
+		},
+		{
+			"key": "forwarder_address",
+			"value": "merchant@gmail.com",
+			"description": "Merchant mailbox for the ARC (Gmail auto-forward) requests. Must be in BANK_FORWARDER_ALLOWLIST on PayGate when that list is not empty."
+		},
+		{
+			"key": "account_number",
+			"value": "",
+			"description": "Receiving account number parsed from the email. Leave empty to send null (Timo emails carry none)."
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Builds the webhook body email-notification would send (parsed Timo credit +",
+					"// the email's header fields) and signs it.",
+					"// signed_payload = \"{timestamp}.{raw_body}\"",
+					"// signature      = hex(HMAC_SHA256(signed_payload, bank_notify_secret))",
+					"//",
+					"// The scenario is chosen by the request name; \"[replay]\" re-sends the previous",
+					"// body unchanged. pm.request.body.raw still holds unresolved {{variables}} at",
+					"// script time, so the final JSON is computed here, stored in _body (the",
+					"// request's raw body) and that exact string is signed.",
+					"",
+					"const name = pm.info.requestName;",
+					"const v = (k) => pm.variables.replaceIn('{{' + k + '}}');",
+					"const has = (s) => name.indexOf(s) !== -1;",
+					"",
+					"const secret = v('bank_notify_secret');",
+					"const timestamp = Math.floor(Date.now() / 1000).toString();",
+					"",
+					"let body;",
+					"if (has('[replay]')) {",
+					"    body = pm.collectionVariables.get('_last_body');",
+					"    if (!body) throw new Error('Run another request first: nothing to replay');",
+					"} else {",
+					"    const dots = (n) => String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');",
+					"    const pad = (n) => String(n).padStart(2, '0');",
+					"    const rnd = (len) => Math.random().toString(36).slice(2, 2 + len).padEnd(len, '0');",
+					"",
+					"    const now = new Date();",
+					"    const vn = new Date(now.getTime() + 7 * 3600 * 1000);",
+					"    const amount = parseInt(has('Underpaid') ? v('underpaid_amount') : v('amount'), 10);",
+					"    const code = has('Wrong recipient_code') ? '0000000000' : v('recipient_code');",
+					"    const withCode = !has('Missing recipient_code');",
+					"    const taggedAddr = `${v('forward_local_part')}+${code}@${v('forward_domain')}`;",
+					"    const plainAddr = `${v('forward_local_part')}@${v('forward_domain')}`;",
+					"    const forwarder = v('forwarder_address');",
+					"    const isArc = has('ARC');",
+					"    const isUntrustedSender = has('Untrusted sender');",
+					"    const arcSealer = has('untrusted sealer') ? 'evil.test' : 'google.com';",
+					"",
+					"    const occurredAt = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate(), vn.getUTCHours(), vn.getUTCMinutes()) - 7 * 3600 * 1000).toISOString();",
+					"    const content = `${v('transfer_code')} FT26262${rnd(8).toUpperCase()} tu 0123456789012 NGUYEN VAN A tai TCB.`;",
+					"    const messageId = CryptoJS.SHA256(['timo', amount, occurredAt, content].join('|')).toString(CryptoJS.enc.Hex);",
+					"",
+					"    const email = {",
+					"        message_id_header: `<${rnd(16)}@timo.vn>`,",
+					"        from: isUntrustedSender ? 'attacker@evil.test' : 'support@timo.vn',",
+					"        subject: 'Timo - Bien dong so du',",
+					"        date: now.toUTCString(),",
+					"        return_path: isArc ? forwarder.replace('@', '+caf_=' + plainAddr.replace('@', '=') + '@') : null,",
+					"        to: ['merchant@example.com'],",
+					"        cc: [],",
+					"        delivered_to: [],",
+					"        x_original_to: [],",
+					"        envelope_to: [],",
+					"        x_forwarded_to: [],",
+					"        x_forwarded_for: [],",
+					"        received_for: [],",
+					"        authentication_results: 'mx.example; dkim=pass header.d=timo.vn; spf=pass; dmarc=pass header.from=timo.vn',",
+					"        arc_seals: [],",
+					"        arc_authentication_results: []",
+					"    };",
+					"",
+					"    if (isUntrustedSender) {",
+					"        email.authentication_results = 'mx.example; dkim=none; spf=fail smtp.mailfrom=evil.test';",
+					"    }",
+					"    if (isArc) {",
+					"        // Gmail auto-forward: the mailbox provider sees dkim/dmarc fail but arc=pass.",
+					"        email.authentication_results = 'mx.example; dkim=fail header.d=timo.vn; dmarc=fail header.from=timo.vn; spf=pass smtp.mailfrom=gmail.com; arc=pass';",
+					"        email.arc_seals = [",
+					"            { i: 3, d: v('forward_domain'), cv: 'pass' },",
+					"            { i: 2, d: arcSealer, cv: 'pass' },",
+					"            { i: 1, d: arcSealer, cv: 'none' }",
+					"        ];",
+					"        email.arc_authentication_results = [",
+					"            { i: 1, value: 'mx.google.com; dkim=pass header.i=@timo.vn; spf=pass; dmarc=pass header.from=timo.vn' }",
+					"        ];",
+					"        email.delivered_to = [plainAddr];",
+					"        email.x_forwarded_to = [plainAddr];",
+					"        email.x_forwarded_for = withCode ? [forwarder, taggedAddr] : [forwarder, plainAddr];",
+					"    } else {",
+					"        email.delivered_to = [withCode ? taggedAddr : plainAddr];",
+					"    }",
+					"",
+					"    body = JSON.stringify({",
+					"        message_id: messageId,",
+					"        transfer_code: v('transfer_code'),",
+					"        amount: amount,",
+					"        account_number: v('account_number') || null,",
+					"        bank: 'timo',",
+					"        content: content,",
+					"        received_at: occurredAt,",
+					"        email: email",
+					"    });",
+					"    pm.collectionVariables.set('_last_body', body);",
+					"}",
+					"",
+					"const signature = CryptoJS.HmacSHA256(`${timestamp}.${body}`, secret).toString(CryptoJS.enc.Hex);",
+					"",
+					"pm.collectionVariables.set('_body', body);",
+					"pm.collectionVariables.set('_computed_timestamp', timestamp);",
+					"pm.collectionVariables.set('_computed_signature', signature);"
+				]
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "Complete payment (valid)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Timestamp",
+						"value": "{{_computed_timestamp}}"
+					},
+					{
+						"key": "X-Signature",
+						"value": "{{_computed_signature}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{{_body}}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/webhooks/bank-transfer",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"webhooks",
+						"bank-transfer"
+					]
+				},
+				"description": "Direct Timo email: sender timo.vn with an aligned DKIM pass, delivered to paygate+{recipient_code}@{forward_domain}, amount >= transaction amount. Expect 200 `processed`; the transaction becomes `completed`. A transaction completes only once: use a new transfer_code to retry."
+			},
+			"response": []
+		},
+		{
+			"name": "Complete payment via Gmail ARC forward",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Timestamp",
+						"value": "{{_computed_timestamp}}"
+					},
+					{
+						"key": "X-Signature",
+						"value": "{{_computed_signature}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{{_body}}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/webhooks/bank-transfer",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"webhooks",
+						"bank-transfer"
+					]
+				},
+				"description": "Gmail auto-forward shape: Hostinger sees dkim/dmarc fail but arc=pass, ARC sealed by google.com, ARC-Authentication-Results i=1 has dkim+dmarc pass for timo.vn, forwarder in x_forwarded_for / return_path. Expect 200 `processed` when forwarder_address is allowlisted (or the list is empty)."
+			},
+			"response": []
+		},
+		{
+			"name": "Replay same message [replay]",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Timestamp",
+						"value": "{{_computed_timestamp}}"
+					},
+					{
+						"key": "X-Signature",
+						"value": "{{_computed_signature}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{{_body}}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/webhooks/bank-transfer",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"webhooks",
+						"bank-transfer"
+					]
+				},
+				"description": "Re-sends the previous request's body unchanged (same message_id). Expect 200 `duplicate` (or `already_completed`). Run right after another request in this collection."
+			},
+			"response": []
+		},
+		{
+			"name": "Underpaid",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Timestamp",
+						"value": "{{_computed_timestamp}}"
+					},
+					{
+						"key": "X-Signature",
+						"value": "{{_computed_signature}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{{_body}}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/webhooks/bank-transfer",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"webhooks",
+						"bank-transfer"
+					]
+				},
+				"description": "Amount lower than the transaction amount. Expect 200 `underpaid`; the transaction stays `pending` and gets a payment issue shown in the portal."
+			},
+			"response": []
+		},
+		{
+			"name": "Wrong recipient_code",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Timestamp",
+						"value": "{{_computed_timestamp}}"
+					},
+					{
+						"key": "X-Signature",
+						"value": "{{_computed_signature}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{{_body}}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/webhooks/bank-transfer",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"webhooks",
+						"bank-transfer"
+					]
+				},
+				"description": "Forward address carries code 0000000000, which isn't the account's active code. Production: expect 200 `rejected` / `invalid_recipient`, transaction untouched. In APP_ENV=development PayGate skips the recipient code check, so expect `processed` there; the rejection applies in production."
+			},
+			"response": []
+		},
+		{
+			"name": "Missing recipient_code",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Timestamp",
+						"value": "{{_computed_timestamp}}"
+					},
+					{
+						"key": "X-Signature",
+						"value": "{{_computed_signature}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{{_body}}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/webhooks/bank-transfer",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"webhooks",
+						"bank-transfer"
+					]
+				},
+				"description": "No header carries a recipient code. Production: expect 200 `rejected` / `invalid_recipient`. In APP_ENV=development PayGate skips the recipient code check, so expect `processed` there; the rejection applies in production."
+			},
+			"response": []
+		},
+		{
+			"name": "Untrusted sender",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Timestamp",
+						"value": "{{_computed_timestamp}}"
+					},
+					{
+						"key": "X-Signature",
+						"value": "{{_computed_signature}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{{_body}}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/webhooks/bank-transfer",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"webhooks",
+						"bank-transfer"
+					]
+				},
+				"description": "From attacker@evil.test with no DKIM pass. Expect 200 `rejected` with reason `untrusted_sender`. Applies in every environment."
+			},
+			"response": []
+		},
+		{
+			"name": "ARC with untrusted sealer",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Timestamp",
+						"value": "{{_computed_timestamp}}"
+					},
+					{
+						"key": "X-Signature",
+						"value": "{{_computed_signature}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{{_body}}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/webhooks/bank-transfer",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"webhooks",
+						"bank-transfer"
+					]
+				},
+				"description": "Like the Gmail ARC request but the ARC chain is sealed by evil.test instead of google.com. Expect 200 `rejected` with reason `untrusted_sender`."
+			},
+			"response": []
+		}
+	]
+}
