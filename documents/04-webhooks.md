@@ -10,6 +10,7 @@ PayGate can push events to your own server so you don't have to poll. This page 
 
 - **Outgoing** (PayGate → you): register a `webhook_url` on your app and PayGate will POST events to it. See [04.01 — Registering your webhook](04.01-registering-your-webhook.html) for setup and signature verification.
 - **Incoming** (Stripe → PayGate): `POST /api/v1/webhooks/stripe` is PayGate's own endpoint — Stripe calls it, not you. Documented below so you understand what triggers your outgoing events.
+- **Incoming** (bank transfer → PayGate): `POST /api/v1/webhooks/bank-transfer` is called only by PayGate's own `email-notification` service after it reads a bank balance-change email. It is signed with a shared secret (`X-Timestamp` + `X-Signature = hex hmac_sha256(BANK_NOTIFY_SECRET, "{timestamp}.{raw_body}")`, timestamp within 5 minutes) and is not part of your integration; a confirmed transfer produces the same outgoing `transaction.completed` event as PayOS.
 
 ## Events PayGate sends you
 
