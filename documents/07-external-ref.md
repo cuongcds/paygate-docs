@@ -9,7 +9,7 @@ nav_order: 7
 
 ## It depends on auth strategy, not on `mode`
 
-`mode: "payment"` vs `mode: "subscription"` ([03.01](03.01-checkout-sessions.html)) only changes whether a subscription record is created — it has **no effect** on how `external_ref` is determined. That's controlled entirely by which [authentication strategy](02-authentication.html) your app uses:
+`mode: "payment"` vs `mode: "subscription"` ([03.01](03.01-checkout-sessions.html)) only changes whether a subscription record is created (and that a subscription also needs a `price_id` and `customer_id`) — it has **no effect** on how `external_ref` is determined. That's controlled entirely by which [authentication strategy](02-authentication.html) your app uses:
 
 | | HMAC | Firebase ID Token |
 | --- | --- | --- |
@@ -33,7 +33,7 @@ Once a checkout is created, the same `external_ref` value threads through everyt
 | [`GET /api/v1/subscriptions/{external_ref}`](03.02-subscriptions.html) | Path parameter — looks up the subscription row keyed by `(app_id, external_ref)` |
 | [`GET /api/v1/transactions/{transaction_id}`](03.05-transactions.html) | Returned as `data.external_ref` in the response — compare it against what you expected before trusting the result |
 | `success_url`/`cancel_url` redirect params | Appended as `paygate_external_ref` — see [03.01 — What comes back on success_url/cancel_url](03.01-checkout-sessions.html#what-comes-back-on-success_urlcancel_url) |
-| [Outgoing webhooks](04.01-registering-your-webhook.html) | Included in `data.external_ref` on every `subscription.updated` event |
+| [Outgoing webhooks](04.01-registering-your-webhook.html) | Included in `data.external_ref` on every subscription and `transaction.completed` event |
 
 It is never translated, hashed, or namespaced — the exact string you sent (HMAC) or the exact `sub` claim (Firebase ID Token) is what comes back everywhere above.
 
@@ -49,6 +49,10 @@ It is never translated, hashed, or namespaced — the exact string you sent (HMA
 | `subscriptions` | Exactly one (or zero, if the user has never completed a subscription checkout) |
 
 **Practical consequence:** if a user has multiple transactions, `GET /api/v1/subscriptions/{external_ref}` ([03.02](03.02-subscriptions.html)) only ever tells you their *current* subscription state — it can't tell you which specific checkout attempt just happened, or distinguish two separate one-time payments. When you need to confirm one particular attempt (e.g. handling a `success_url` redirect, or reconciling a specific purchase), use the `paygate_transaction_id` from that redirect with [`GET /api/v1/transactions/{transaction_id}`](03.05-transactions.html) instead of relying on `external_ref` alone.
+
+## A subscription is also tied to a customer
+
+Besides `external_ref`, a subscription records a `customer_id` (`cus_…`) — the billing contact PayGate emails reminders to. Customers are per-app records that **you create** ([03.06 — Customers](03.06-customers.html)) and pass as `customer_id` in a `mode: "subscription"` checkout ([03.01](03.01-checkout-sessions.html)); `GET /api/v1/subscriptions/{external_ref}` returns the `customer_id`, and you can change it with [`PUT .../customer`](03.02-subscriptions.html). `external_ref` identifies *your user*; the customer identifies *who PayGate bills and writes to* — they are separate. With Firebase ID Token, a customer is bound to the token's `sub`, so a user can only use customers they created themselves. If you want to link customers back to your own records, set `merchant_customer_id` (echoed in webhooks).
 
 ## Practical implications
 

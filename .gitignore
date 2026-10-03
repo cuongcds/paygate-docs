@@ -1,3 +1,7 @@
 # paygate-php/ is its own repo (github.com/cuongcds/paygate-php), just
 # nested here as a filesystem location — not a submodule of this repo.
 paygate-php/
+
+# paygate-nodejs/ is its own repo (github.com/cuongcds/paygate-node), nested here
+# as a filesystem location.
+paygate-nodejs/

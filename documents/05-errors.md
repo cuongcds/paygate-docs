@@ -20,13 +20,16 @@ Every error response follows the same shape:
 | `expired_timestamp` | 401 | `X-Timestamp` more than 5 minutes off the server's clock | Check both directions — a client clock running fast fails the same as one running slow |
 | `invalid_token` | 401 | Firebase ID Token failed signature/issuer/expiry checks | |
 | `app_not_found` | 401 | Firebase ID Token's `aud` doesn't match any registered app | |
-| `invalid_request` | 400 | Body validation failed (missing/invalid field) | `message` describes the specific field |
+| `invalid_request` | 400 | Body validation failed (missing/invalid field) | `message` describes the specific field. Also returned when a `mode: "subscription"` checkout sends `plan_id`, `amount`, `currency`, `interval`, `interval_count` or `plan_ref`, or omits `price_id`/`customer_id` |
 | `payment_method_not_allowed` | 403 | Requested `payment_method` isn't enabled for your app's environment/configuration | e.g. `test` against a `production` app, or `stripe` against an app with no active Stripe credentials |
 | `provider_error` | 502 | Stripe/PayOS itself rejected the request | Transient — safe to retry with backoff |
 | `invalid_card_details` | 400 | Test Payment Method card declined on the hosted picker page (`test_card_code=4000000000000002`) — not returned by `checkout-sessions` itself | |
 | `insufficient_funds` | 402 | Test Payment Method card declined on the hosted picker page (`test_card_code=4000000000009995`) — not returned by `checkout-sessions` itself | |
-| `not_found` | 404 | `GET /subscriptions/{external_ref}` — no subscription record for that user; or `GET /transactions/{transaction_id}` — id doesn't exist, or belongs to a different app/user | Not necessarily an error in your flow |
-| `forbidden` | 403 | Firebase ID Token caller requested a different `external_ref` than their own token's `sub` | |
+| `not_found` | 404 | `/subscriptions/{external_ref}` — no subscription record for that user; `GET /transactions/{transaction_id}` — id doesn't exist, or belongs to a different app/user; `/customers/{id}`, `/plans/{id}`, `/plans/{id}/prices/{price_id}` — doesn't exist, belongs to another app (or, for customers with Firebase ID Token, another user), or the price isn't under that plan | Not necessarily an error in your flow |
+| `forbidden` | 403 | Firebase ID Token caller requested a different `external_ref` than their own token's `sub`; **or** a Firebase ID Token app tried to write plans/prices (`POST`/`PATCH` on `/plans…`) or to change a subscription's plan (`PUT /subscriptions/{external_ref}/plan`) — those are HMAC only | |
+| `customer_not_found` | 400 | `customer_id` in a `mode: "subscription"` checkout, or in `PUT /subscriptions/{external_ref}/customer`, is missing, unknown, belongs to another app, or (Firebase ID Token) was created by another user | Create the customer first — [03.06](03.06-customers.html) |
+| `price_not_found` | 400 | `price_id` in a `mode: "subscription"` checkout, or in `PUT /subscriptions/{external_ref}/plan`, is unknown, belongs to another app, is `archived`, or its plan is `archived` | [03.07](03.07-plans-and-prices.html) |
+| `plan_code_taken` | 409 | `POST /plans` with a `code` that already exists in your app | Pick another `code` |
 
 Any other `error.code` not listed here — including the case where a webhook's own signature check fails (returns `invalid_signature` too, but at `400` rather than `401`, since that's PayGate's own inbound endpoint, not one you call) — should be treated as opaque; don't pattern-match on `message` text, only on `code`.
 
@@ -35,7 +38,8 @@ Any other `error.code` not listed here — including the case where a webhook's 
 | Situation | Retry? |
 | --- | --- |
 | `401`/`403` codes | No — fix the request (signature, token, permissions) first |
-| `400` (`invalid_request`, `invalid_card_details`) | No — fix the payload |
+| `400` (`invalid_request`, `customer_not_found`, `price_not_found`, `invalid_card_details`) | No — fix the payload |
+| `409` (`plan_code_taken`) | No — use another plan `code` |
 | `402` (`insufficient_funds`) | No — this is a real decline, ask the user for another payment method |
 | `502` (`provider_error`) | Yes — exponential backoff, this is Stripe/network flaking, not your integration |
 | Network timeout / no response | Yes — but see idempotency note below |

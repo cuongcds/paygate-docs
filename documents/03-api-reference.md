@@ -18,8 +18,12 @@ Always check `success` before reading `data`/`error`. See [Errors](05-errors.htm
 ## Endpoints
 
 - [03.01 — POST /api/v1/checkout-sessions](03.01-checkout-sessions.html)
-- [03.02 — GET /api/v1/subscriptions/{external_ref}](03.02-subscriptions.html)
+- [03.02 — /api/v1/subscriptions/{external_ref} (get, set customer, change plan)](03.02-subscriptions.html)
 - [03.03 — GET /checkout/{public_token} (hosted picker page)](03.03-checkout-page.html)
 - [03.04 — Testing without a real Stripe account](03.04-testing.html)
+- [03.05 — GET /api/v1/transactions/{transaction_id}](03.05-transactions.html)
+- [03.06 — /api/v1/customers](03.06-customers.html)
+- [03.07 — /api/v1/plans (plans and prices)](03.07-plans-and-prices.html)
+- [03.08 — Subscription lifecycle](03.08-subscription-lifecycle.html)
 
 `POST /api/v1/webhooks/stripe` is not called by you — see [Webhooks](04-webhooks.html) instead.

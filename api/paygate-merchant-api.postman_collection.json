@@ -1,7 +1,7 @@
 {
 	"info": {
 		"name": "PayGate Merchant API",
-		"description": "Merchant-facing PayGate endpoints (HMAC auth). See ../documents/ for the full API reference. Firebase ID Token auth is client-side only and intentionally not covered here — see documents/02-authentication.md.",
+		"description": "Merchant-facing PayGate endpoints (HMAC auth). See ../documents/ for the full API reference. Suggested order: Customers > Plans > Checkout Sessions > Subscriptions. Firebase ID Token auth is client-side only and intentionally not covered here — see documents/02-authentication.md.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
@@ -9,7 +9,11 @@
 		{ "key": "api_key", "value": "pgk_your_api_key", "description": "Your app's api_key (X-App-Key)." },
 		{ "key": "api_secret", "value": "your_api_secret", "description": "Your app's api_secret, used only to sign requests locally in the pre-request script — never sent as a header itself." },
 		{ "key": "external_ref", "value": "test-user-1", "description": "Your identifier for the end user placing the request." },
-		{ "key": "transaction_id", "value": "42", "description": "PayGate's transaction id — e.g. the paygate_transaction_id query param from a success_url/cancel_url redirect." }
+		{ "key": "transaction_id", "value": "42", "description": "PayGate's transaction id — e.g. the paygate_transaction_id query param from a success_url/cancel_url redirect." },
+		{ "key": "customer_id", "value": "cus_replace_me", "description": "A customer id (cus_…). Filled automatically by \"Create customer\" (test script); paste an existing one to skip that step." },
+		{ "key": "plan_id", "value": "plan_replace_me", "description": "A plan id. Filled automatically by \"Create plan (Pro, three prices)\"." },
+		{ "key": "price_id", "value": "price_replace_me", "description": "A price id used for checkout and archive/restore price. Set by \"Create plan\" to the plan's first price (Pro monthly)." },
+		{ "key": "price_id_yearly", "value": "price_replace_me", "description": "The last price of the plan created by \"Create plan\" (Pro yearly) — the target of \"Switch price\"." }
 	],
 	"event": [
 		{
@@ -54,6 +58,277 @@
 	],
 	"item": [
 		{
+			"name": "Customers",
+			"item": [
+				{
+					"name": "Create customer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Nguyen Van A\",\n  \"email\": \"a@example.com\",\n  \"cc_emails\": [\n    \"billing@example.com\"\n  ],\n  \"bcc_emails\": [],\n  \"merchant_customer_id\": \"{{external_ref}}\",\n  \"locale\": \"en\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/customers",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "customers" ]
+						},
+						"description": "Creates a customer (`cus_…`) that subscriptions are billed to. `cc_emails`/`bcc_emails` (max 5 each) receive renewal notices; `locale` is `en` or `vi`. The test script stores the returned id in `customer_id`. See documents/03.06-customers.md."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 2xx', function () {",
+									"    pm.response.to.be.success;",
+									"});",
+									"const body = pm.response.json();",
+									"pm.test('Returns a customer id', function () {",
+									"    pm.expect(body.data.id).to.match(/^cus_/);",
+									"});",
+									"if (body.data && body.data.id) {",
+									"    pm.collectionVariables.set('customer_id', body.data.id);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get customer",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/customers/{{customer_id}}",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "customers", "{{customer_id}}" ]
+						},
+						"description": "Returns 404 not_found for an unknown id or one that belongs to another app. See documents/03.06-customers.md."
+					},
+					"response": []
+				},
+				{
+					"name": "Update customer",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Nguyen Van A (updated)\",\n  \"cc_emails\": [\n    \"billing@example.com\",\n    \"finance@example.com\"\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/customers/{{customer_id}}",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "customers", "{{customer_id}}" ]
+						},
+						"description": "Partial update — send only the fields to change. `cc_emails`/`bcc_emails` replace the whole list; `merchant_customer_id: null` clears it. See documents/03.06-customers.md."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Plans",
+			"item": [
+				{
+					"name": "List plans",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/plans",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "plans" ],
+							"query": [
+								{ "key": "status", "value": "active", "disabled": true, "description": "active | archived" }
+							]
+						},
+						"description": "Lists this app's plans with all their prices. Enable the `status` query param (`active` or `archived`) to filter. Query strings are never signed, so toggling it needs no other change. See documents/03.07-plans-and-prices.md."
+					},
+					"response": []
+				},
+				{
+					"name": "Create plan (Pro, three prices)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"pro\",\n  \"name\": \"Pro\",\n  \"description\": \"Pro plan\",\n  \"prices\": [\n    {\n      \"name\": \"Pro monthly\",\n      \"amount\": 199000,\n      \"currency\": \"VND\",\n      \"interval_unit\": \"month\",\n      \"interval_count\": 1,\n      \"trial\": {\n        \"amount\": 0,\n        \"interval_unit\": \"day\",\n        \"interval_count\": 7\n      }\n    },\n    {\n      \"name\": \"Pro half year\",\n      \"amount\": 1074000,\n      \"currency\": \"VND\",\n      \"interval_unit\": \"month\",\n      \"interval_count\": 6\n    },\n    {\n      \"name\": \"Pro yearly\",\n      \"amount\": 1990000,\n      \"currency\": \"VND\",\n      \"interval_unit\": \"year\",\n      \"interval_count\": 1\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/plans",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "plans" ]
+						},
+						"description": "A plan holds many prices that are on sale at once. This creates Plan \"Pro\" with Pro monthly (7-day free trial), Pro half year (6 months) and Pro yearly. `code` must be unique per app (409 plan_code_taken otherwise — change it to re-run). Plan writes are HMAC-only. The test script stores `plan_id`, `price_id` (first price) and `price_id_yearly` (last price). See documents/03.07-plans-and-prices.md."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 2xx', function () {",
+									"    pm.response.to.be.success;",
+									"});",
+									"const body = pm.response.json();",
+									"pm.test('Returns a plan with prices', function () {",
+									"    pm.expect(body.data.id).to.be.a('string');",
+									"    pm.expect(body.data.prices).to.be.an('array').that.is.not.empty;",
+									"});",
+									"if (body.data && body.data.prices && body.data.prices.length) {",
+									"    pm.collectionVariables.set('plan_id', body.data.id);",
+									"    pm.collectionVariables.set('price_id', body.data.prices[0].id);",
+									"    pm.collectionVariables.set('price_id_yearly', body.data.prices[body.data.prices.length - 1].id);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get plan",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/plans/{{plan_id}}",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "plans", "{{plan_id}}" ]
+						},
+						"description": "Returns the plan with all its prices. See documents/03.07-plans-and-prices.md."
+					},
+					"response": []
+				},
+				{
+					"name": "Update plan",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Pro (renamed)\",\n  \"description\": \"Updated description\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/plans/{{plan_id}}",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "plans", "{{plan_id}}" ]
+						},
+						"description": "Updates `name`, `description` and/or `status` (`active`|`archived`). Price amounts are immutable — add a new price instead. See documents/03.07-plans-and-prices.md."
+					},
+					"response": []
+				},
+				{
+					"name": "Add price to plan",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Pro quarterly\",\n  \"amount\": 549000,\n  \"currency\": \"VND\",\n  \"interval_unit\": \"month\",\n  \"interval_count\": 3\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/plans/{{plan_id}}/prices",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "plans", "{{plan_id}}", "prices" ]
+						},
+						"description": "Adds one more price on sale; the plan's other prices are untouched. Same shape as an entry of `prices` in Create plan (optional `trial`). See documents/03.07-plans-and-prices.md."
+					},
+					"response": []
+				},
+				{
+					"name": "Archive price",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"archived\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/plans/{{plan_id}}/prices/{{price_id}}",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "plans", "{{plan_id}}", "prices", "{{price_id}}" ]
+						},
+						"description": "Takes a price off sale: no new checkouts, existing subscriptions keep renewing. `name` can also be changed here. See documents/03.07-plans-and-prices.md."
+					},
+					"response": []
+				},
+				{
+					"name": "Restore price",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"active\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/plans/{{plan_id}}/prices/{{price_id}}",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "plans", "{{plan_id}}", "prices", "{{price_id}}" ]
+						},
+						"description": "Puts an archived price back on sale. See documents/03.07-plans-and-prices.md."
+					},
+					"response": []
+				}
+			]
+		},
+		{
 			"name": "Checkout Sessions",
 			"item": [
 				{
@@ -68,16 +343,71 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"external_ref\": \"{{external_ref}}\",\n  \"plan_ref\": \"premium_1m\",\n  \"amount\": 199000,\n  \"currency\": \"VND\",\n  \"mode\": \"subscription\",\n  \"interval\": \"month\",\n  \"interval_count\": 1,\n  \"success_url\": \"https://yourapp.com/success\",\n  \"cancel_url\": \"https://yourapp.com/cancel\"\n}"
+							"raw": "{\n  \"external_ref\": \"{{external_ref}}\",\n  \"mode\": \"subscription\",\n  \"price_id\": \"{{price_id}}\",\n  \"customer_id\": \"{{customer_id}}\",\n  \"success_url\": \"https://yourapp.com/success\",\n  \"cancel_url\": \"https://yourapp.com/cancel\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/checkout-sessions",
 							"host": [ "{{base_url}}" ],
 							"path": [ "api", "v1", "checkout-sessions" ]
 						},
-						"description": "No `payment_method` sent — see documents/03.01-checkout-sessions.md. Redirect the end user to `data.checkout_url` in the response. Your success_url/cancel_url will come back with paygate_transaction_id/paygate_external_ref/paygate_status appended — see documents/03.01-checkout-sessions.md > \"What comes back on success_url/cancel_url\"."
+						"description": "Subscription checkout: send `price_id` + `customer_id` (run Customers > Create customer and Plans > Create plan first). Do NOT send plan_ref/amount/currency/interval/interval_count/plan_id — they are derived from the price and rejected with 400. If the price has a trial the response has `trial: true`. No `payment_method` sent — see documents/03.01-checkout-sessions.md and documents/03.08-subscription-lifecycle.md. Redirect the end user to `data.checkout_url`. `success_url` / `cancel_url` come back with paygate_transaction_id/paygate_external_ref/paygate_status appended — see documents/03.01-checkout-sessions.md."
 					},
-					"response": []
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 2xx', function () {",
+									"    pm.response.to.be.success;",
+									"});",
+									"pm.test('Returns a checkout_url', function () {",
+									"    pm.expect(pm.response.json().data.checkout_url).to.be.a('string').and.not.empty;",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Create checkout session (skip trial)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"external_ref\": \"{{external_ref}}\",\n  \"mode\": \"subscription\",\n  \"price_id\": \"{{price_id}}\",\n  \"customer_id\": \"{{customer_id}}\",\n  \"success_url\": \"https://yourapp.com/success\",\n  \"cancel_url\": \"https://yourapp.com/cancel\",\n  \"skip_trial\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/checkout-sessions",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "checkout-sessions" ]
+						},
+						"description": "`skip_trial: true` charges the full price immediately even when the price defines a trial. See documents/03.08-subscription-lifecycle.md. `success_url` / `cancel_url` come back with paygate_transaction_id/paygate_external_ref/paygate_status appended — see documents/03.01-checkout-sessions.md."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 2xx', function () {",
+									"    pm.response.to.be.success;",
+									"});",
+									"pm.test('Returns a checkout_url', function () {",
+									"    pm.expect(pm.response.json().data.checkout_url).to.be.a('string').and.not.empty;",
+									"});"
+								]
+							}
+						}
+					]
 				},
 				{
 					"name": "Create one-time payment (production — Stripe/picker)",
@@ -100,7 +430,23 @@
 						},
 						"description": "`mode=\"payment\"` — a single non-recurring charge, no `interval`/`interval_count` needed (those only apply to `mode=\"subscription\"`). No `payment_method` sent — see documents/03.01-checkout-sessions.md. Redirect the end user to `data.checkout_url` in the response. Your success_url/cancel_url will come back with paygate_transaction_id/paygate_external_ref/paygate_status appended."
 					},
-					"response": []
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 2xx', function () {",
+									"    pm.response.to.be.success;",
+									"});",
+									"pm.test('Returns a checkout_url', function () {",
+									"    pm.expect(pm.response.json().data.checkout_url).to.be.a('string').and.not.empty;",
+									"});"
+								]
+							}
+						}
+					]
 				},
 				{
 					"name": "Create checkout session (payment_method=test — picker)",
@@ -114,7 +460,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"external_ref\": \"{{external_ref}}\",\n  \"plan_ref\": \"premium_1m\",\n  \"amount\": 199000,\n  \"currency\": \"VND\",\n  \"mode\": \"subscription\",\n  \"interval\": \"month\",\n  \"interval_count\": 1,\n  \"success_url\": \"https://yourapp.com/success\",\n  \"cancel_url\": \"https://yourapp.com/cancel\",\n  \"payment_method\": \"test\"\n}"
+							"raw": "{\n  \"external_ref\": \"{{external_ref}}\",\n  \"mode\": \"subscription\",\n  \"price_id\": \"{{price_id}}\",\n  \"customer_id\": \"{{customer_id}}\",\n  \"success_url\": \"https://yourapp.com/success\",\n  \"cancel_url\": \"https://yourapp.com/cancel\",\n  \"payment_method\": \"test\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/checkout-sessions",
@@ -123,7 +469,23 @@
 						},
 						"description": "Only works when your app's environment allows Test Payment Method (`test`/`staging`) — see documents/08-test-payment-method-va-che-do-moi-truong.md. Still just returns `data.checkout_url` pointing to PayGate's hosted picker page — open it in a browser and submit a test_card_code there (documents/03.04-testing.md), this request never resolves a payment result itself."
 					},
-					"response": []
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 2xx', function () {",
+									"    pm.response.to.be.success;",
+									"});",
+									"pm.test('Returns a checkout_url', function () {",
+									"    pm.expect(pm.response.json().data.checkout_url).to.be.a('string').and.not.empty;",
+									"});"
+								]
+							}
+						}
+					]
 				}
 			]
 		},
@@ -144,7 +506,53 @@
 							"host": [ "{{base_url}}" ],
 							"path": [ "api", "v1", "subscriptions", "{{external_ref}}" ]
 						},
-						"description": "Returns 404 not_found if this external_ref has never checked out — see documents/03.02-subscriptions.md."
+						"description": "Returns 404 not_found if this external_ref has never checked out. Includes `plan_id`, `price_id`, `customer_id`, `in_trial`, `trial_ends_at`; `status` is the effective status. See documents/03.02-subscriptions.md and documents/03.08-subscription-lifecycle.md."
+					},
+					"response": []
+				},
+				{
+					"name": "Set subscription customer",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"customer_id\": \"{{customer_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/{{external_ref}}/customer",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "subscriptions", "{{external_ref}}", "customer" ]
+						},
+						"description": "Changes which customer the subscription is billed to / notified. See documents/03.08-subscription-lifecycle.md and documents/03.06-customers.md."
+					},
+					"response": []
+				},
+				{
+					"name": "Switch price",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "X-App-Key", "value": "{{api_key}}" },
+							{ "key": "X-Timestamp", "value": "{{_computed_timestamp}}" },
+							{ "key": "X-Signature", "value": "{{_computed_signature}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"price_id\": \"{{price_id_yearly}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/{{external_ref}}/plan",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "subscriptions", "{{external_ref}}", "plan" ]
+						},
+						"description": "Moves the subscription to another price (e.g. monthly to yearly). Takes effect from the next renewal — the current period is not re-charged. See documents/03.08-subscription-lifecycle.md."
 					},
 					"response": []
 				}
