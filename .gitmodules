@@ -1,0 +1,6 @@
+[submodule "paygate-nodejs"]
+	path = paygate-nodejs
+	url = git@github.com:cuongcds/paygate-node.git
+[submodule "paygate-php"]
+	path = paygate-php
+	url = git@github.com:cuongcds/paygate-php.git
